@@ -458,28 +458,64 @@ let currentBet = null;
 let matches = [];
 
 // ==================== TELEGRAM USER ====================
+// ==================== TELEGRAM USER ====================
 function getTgUser() {
   try {
     const tg = window.Telegram?.WebApp;
-    if (tg?.initDataUnsafe?.user) {
+    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
       return tg.initDataUnsafe.user;
     }
-  } catch(e) {}
-  // fallback для разработки — можно заменить своим ID
-  return { id: ADMIN_ID, first_name: 'Admin', username: 'admin' };
+  } catch (e) {
+    console.warn("Telegram WebApp не инициализирован или недоступен", e);
+  }
+  return null;  // ← критически важно: null, а не админ
 }
 
 // ==================== INIT ====================
 async function init() {
-  setLoader('Подключение к серверу...');
+  setLoader('Проверка окружения...');
 
   const tgUser = getTgUser();
 
-  // Enable Telegram WebApp if available
+  if (!tgUser) {
+    // Не в Telegram → показываем заглушку и останавливаем всё
+    document.getElementById('loaderScreen').style.display = 'flex';
+    document.getElementById('loaderText').innerHTML = `
+      <div style="text-align:center; padding:20px; line-height:1.6;">
+        <div style="font-size:28px; margin-bottom:16px;">⚠️ Это Telegram-приложение</div>
+        <div style="font-size:18px; color:#f5c518; margin:20px 0;">
+          Откройте его внутри Telegram через бота
+        </div>
+        <div style="font-size:22px; font-weight:bold; color:white;">
+          @ИмяТвоегоБота
+        </div>
+        <div style="font-size:14px; color:#8892a0; margin-top:24px;">
+          Скопируйте ссылку или откройте через меню бота
+        </div>
+      </div>
+    `;
+    document.querySelector('.loader-spinner').style.display = 'none';
+    
+    // Опционально: можно добавить кнопку/ссылку
+    // document.getElementById('loaderText').innerHTML += `<br><br><a href="https://t.me/ИмяТвоегоБота?start=app" style="color:#f5c518; text-decoration:underline;">Открыть бота</a>`;
+    
+    return;  // ← важно: прерываем init полностью
+  }
+
+  // Мы здесь → приложение открыто внутри Telegram
   try {
-    window.Telegram?.WebApp?.ready();
-    window.Telegram?.WebApp?.expand();
-  } catch(e) {}
+    window.Telegram.WebApp.ready();
+    window.Telegram.WebApp.expand();
+  } catch (e) {
+    console.warn("Не удалось вызвать ready() / expand()", e);
+  }
+
+  setLoader('Загрузка профиля...');
+
+  // ────────────── дальше ВЕСЬ твой остальной код без изменений ──────────────
+  // upsert user в supabase, loadMatches, updateBalance, checkBonus и т.д.
+  // ...
+}
 
   setLoader('Загрузка профиля...');
 
