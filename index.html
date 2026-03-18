@@ -465,8 +465,8 @@ function getTgUser() {
       return tg.initDataUnsafe.user;
     }
   } catch(e) {}
-  // fallback для разработки — можно заменить своим ID
-  return { id: ADMIN_ID, first_name: 'Admin', username: 'admin' };
+  // Если приложение открыто не через Telegram — возвращаем null
+  return null;
 }
 
 // ==================== INIT ====================
@@ -474,6 +474,12 @@ async function init() {
   setLoader('Подключение к серверу...');
 
   const tgUser = getTgUser();
+
+  // Если не открыто через Telegram — показываем ошибку
+  if (!tgUser) {
+    document.getElementById('loaderText').textContent = 'Откройте приложение через Telegram';
+    return;
+  }
 
   // Enable Telegram WebApp if available
   try {
