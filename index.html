@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BolBet</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
@@ -302,7 +303,6 @@
   <div class="loader-logo">BOL<span>BET</span></div>
   <div class="loader-spinner"></div>
   <div class="loader-text" id="loaderText">Загрузка...</div>
-  <div id="debugInfo" style="font-size:11px;color:#666;margin-top:20px;padding:0 20px;text-align:center;word-break:break-all;max-height:200px;overflow-y:auto"></div>
 </div>
 
 <!-- APP -->
@@ -459,11 +459,6 @@ let currentBet = null;
 let matches = [];
 
 // ==================== TELEGRAM USER ====================
-function debug(msg) {
-  const el = document.getElementById('debugInfo');
-  if (el) el.innerHTML += msg + '<br>';
-}
-
 function isAdmin(userId) {
   return Number(userId) === Number(ADMIN_ID);
 }
@@ -477,18 +472,12 @@ function waitForTgUser() {
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
-      const tg = window.Telegram?.WebApp;
-      const user = tg?.initDataUnsafe?.user;
+      const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
       if (user) {
         clearInterval(interval);
         resolve(user);
       } else if (attempts >= 30) {
         clearInterval(interval);
-        // Выводим отладочную информацию
-        debug('❌ tg exists: ' + !!window.Telegram?.WebApp);
-        debug('initData: ' + (window.Telegram?.WebApp?.initData || 'пусто'));
-        debug('initDataUnsafe: ' + JSON.stringify(window.Telegram?.WebApp?.initDataUnsafe || {}));
-        debug('version: ' + (window.Telegram?.WebApp?.version || 'н/д'));
         resolve(null);
       }
     }, 100);
@@ -508,11 +497,12 @@ async function init() {
   const tgUser = await waitForTgUser();
 
   if (!tgUser) {
-    document.getElementById('loaderText').textContent = 'Ошибка авторизации — см. ниже:';
+    document.getElementById('loaderText').textContent = 'Ошибка: откройте приложение через Telegram';
     return;
   }
 
-  // upsert user
+  setLoader('Загрузка профиля...');
+
   const today = new Date().toISOString().split('T')[0];
   let { data: user, error } = await db
     .from('users')
@@ -535,19 +525,19 @@ async function init() {
 
   currentUser = user;
 
-  // show admin nav if admin
-  if (tgUser.id === ADMIN_ID) {
+  if (isAdmin(tgUser.id)) {
     document.querySelector('.admin-nav').style.display = '';
+  } else {
+    document.querySelector('.admin-nav').style.display = 'none';
   }
 
   setLoader('Загрузка матчей...');
   await loadMatches();
 
-  // update UI
   updateBalance();
   checkBonus();
   renderProfile();
-  if (currentUser.id === ADMIN_ID) renderAdminMatches();
+  if (isAdmin(tgUser.id)) renderAdminMatches();
 
   // show app
   document.getElementById('loaderScreen').style.display = 'none';
