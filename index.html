@@ -461,29 +461,42 @@ let matches = [];
 function getTgUser() {
   try {
     const tg = window.Telegram?.WebApp;
+    // Сначала вызываем ready() чтобы данные точно загрузились
+    tg?.ready();
     if (tg?.initDataUnsafe?.user) {
       return tg.initDataUnsafe.user;
     }
   } catch(e) {}
-  // Если приложение открыто не через Telegram — возвращаем null
   return null;
+}
+
+function isAdmin(userId) {
+  return Number(userId) === Number(ADMIN_ID);
 }
 
 // ==================== INIT ====================
 async function init() {
   setLoader('Подключение к серверу...');
 
+  // Ждём пока Telegram WebApp полностью инициализируется
+  await new Promise(resolve => {
+    if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+      resolve();
+    } else {
+      // Даём Telegram 500мс на инициализацию
+      setTimeout(resolve, 500);
+    }
+  });
+
   const tgUser = getTgUser();
 
-  // Если не открыто через Telegram — показываем ошибку
   if (!tgUser) {
-    document.getElementById('loaderText').textContent = 'Откройте приложение через Telegram';
+    document.getElementById('loaderText').textContent = 'Ошибка: не удалось получить данные пользователя';
     return;
   }
 
-  // Enable Telegram WebApp if available
+  // Enable Telegram WebApp
   try {
-    window.Telegram?.WebApp?.ready();
     window.Telegram?.WebApp?.expand();
   } catch(e) {}
 
@@ -512,9 +525,11 @@ async function init() {
 
   currentUser = user;
 
-  // show admin nav if admin
-  if (tgUser.id === ADMIN_ID) {
+  // Показываем кнопку Админ ТОЛЬКО для админа
+  if (isAdmin(tgUser.id)) {
     document.querySelector('.admin-nav').style.display = '';
+  } else {
+    document.querySelector('.admin-nav').style.display = 'none';
   }
 
   setLoader('Загрузка матчей...');
@@ -524,7 +539,7 @@ async function init() {
   updateBalance();
   checkBonus();
   renderProfile();
-  if (currentUser.id === ADMIN_ID) renderAdminMatches();
+  if (isAdmin(tgUser.id)) renderAdminMatches();
 
   // show app
   document.getElementById('loaderScreen').style.display = 'none';
