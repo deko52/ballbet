@@ -458,47 +458,52 @@ let currentBet = null;
 let matches = [];
 
 // ==================== TELEGRAM USER ====================
-function getTgUser() {
-  try {
-    const tg = window.Telegram?.WebApp;
-    // Сначала вызываем ready() чтобы данные точно загрузились
-    tg?.ready();
-    if (tg?.initDataUnsafe?.user) {
-      return tg.initDataUnsafe.user;
-    }
-  } catch(e) {}
-  return null;
-}
-
 function isAdmin(userId) {
   return Number(userId) === Number(ADMIN_ID);
+}
+
+// Ждём пока Telegram передаст данные пользователя (до 3 секунд)
+function waitForTgUser() {
+  return new Promise((resolve) => {
+    // Если данные уже есть — сразу возвращаем
+    if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+      resolve(window.Telegram.WebApp.initDataUnsafe.user);
+      return;
+    }
+
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
+      if (user) {
+        clearInterval(interval);
+        resolve(user);
+      } else if (attempts >= 30) { // 30 попыток × 100мс = 3 секунды
+        clearInterval(interval);
+        resolve(null);
+      }
+    }, 100);
+  });
 }
 
 // ==================== INIT ====================
 async function init() {
   setLoader('Подключение к серверу...');
 
-  // Ждём пока Telegram WebApp полностью инициализируется
-  await new Promise(resolve => {
-    if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
-      resolve();
-    } else {
-      // Даём Telegram 500мс на инициализацию
-      setTimeout(resolve, 500);
-    }
-  });
-
-  const tgUser = getTgUser();
-
-  if (!tgUser) {
-    document.getElementById('loaderText').textContent = 'Ошибка: не удалось получить данные пользователя';
-    return;
-  }
-
-  // Enable Telegram WebApp
+  // Вызываем ready() сразу
   try {
+    window.Telegram?.WebApp?.ready();
     window.Telegram?.WebApp?.expand();
   } catch(e) {}
+
+  // Ждём данные пользователя
+  setLoader('Авторизация...');
+  const tgUser = await waitForTgUser();
+
+  if (!tgUser) {
+    document.getElementById('loaderText').textContent = 'Ошибка: откройте приложение через Telegram';
+    return;
+  }
 
   setLoader('Загрузка профиля...');
 
